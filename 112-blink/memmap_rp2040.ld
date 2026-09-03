@@ -1,286 +1,53 @@
-/* Based on GCC ARM embedded samples.
-   Defines the following symbols for use by code:
-    __exidx_start
-    __exidx_end
-    __etext
-    __data_start__
-    __preinit_array_start
-    __preinit_array_end
-    __init_array_start
-    __init_array_end
-    __fini_array_start
-    __fini_array_end
-    __data_end__
-    __bss_start__
-    __bss_end__
-    __end__
-    end
-    __HeapLimit
-    __StackLimit
-    __StackTop
-    __stack (== StackTop)
-*/
+INCLUDE "memmap_default.incl"
 
-MEMORY
-{
-    INCLUDE "pico_flash_region.ld"
-    RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 256k
-    SCRATCH_X(rwx) : ORIGIN = 0x20040000, LENGTH = 4k
-    SCRATCH_Y(rwx) : ORIGIN = 0x20041000, LENGTH = 4k
-}
-
-ENTRY(_entry_point)
-
-SECTIONS
-{
-    /* Second stage bootloader is prepended to the image. It must be 256 bytes big
-       and checksummed. It is usually built by the boot_stage2 target
-       in the Raspberry Pi Pico SDK
-    */
-
-    .flash_begin : {
-        __flash_binary_start = .;
-    } > FLASH
-
-    .boot2 : {
-        __boot2_start__ = .;
-        KEEP (*(.boot2))
-        __boot2_end__ = .;
-    } > FLASH
-
-    ASSERT(__boot2_end__ - __boot2_start__ == 256,
-        "ERROR: Pico second stage bootloader must be 256 bytes in size")
-
-    /* The second stage will always enter the image at the start of .text.
-       The debugger will use the ELF entry point, which is the _entry_point
-       symbol if present, otherwise defaults to start of .text.
-       This can be used to transfer control back to the bootrom on debugger
-       launches only, to perform proper flash setup.
-    */
-
-    .text : {
-        __logical_binary_start = .;
-        KEEP (*(.vectors))
-        KEEP (*(.binary_info_header))
-        __binary_info_header_end = .;
-        KEEP (*(.embedded_block))
-        __embedded_block_end = .;
-        KEEP (*(.reset))
-        /* TODO revisit this now memset/memcpy/float in ROM */
-        /* bit of a hack right now to exclude all floating point and time critical (e.g. memset, memcpy) code from
-         * FLASH ... we will include any thing excluded here in .data below by default */
-        *(.init)
-        *(EXCLUDE_FILE(*libgcc.a: *libc.a:*lib_a-mem*.o *libm.a:) .text*)
-        *(.fini)
-        /* Pull all c'tors into .text */
-        *crtbegin.o(.ctors)
-        *crtbegin?.o(.ctors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
-        *(SORT(.ctors.*))
-        *(.ctors)
-        /* Followed by destructors */
-        *crtbegin.o(.dtors)
-        *crtbegin?.o(.dtors)
-        *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
-        *(SORT(.dtors.*))
-        *(.dtors)
-
-        . = ALIGN(4);
-        /* preinit data */
-        PROVIDE_HIDDEN (__preinit_array_start = .);
-        KEEP(*(SORT(.preinit_array.*)))
-        KEEP(*(.preinit_array))
-        PROVIDE_HIDDEN (__preinit_array_end = .);
-
-        . = ALIGN(4);
-        /* init data */
-        PROVIDE_HIDDEN (__init_array_start = .);
-        KEEP(*(SORT(.init_array.*)))
-        KEEP(*(.init_array))
-        PROVIDE_HIDDEN (__init_array_end = .);
-
-        . = ALIGN(4);
-        /* finit data */
-        PROVIDE_HIDDEN (__fini_array_start = .);
-        *(SORT(.fini_array.*))
-        *(.fini_array)
-        PROVIDE_HIDDEN (__fini_array_end = .);
-
-        *(.eh_frame*)
-        . = ALIGN(4);
-    } > FLASH
-
-    .rodata : {
-        *(EXCLUDE_FILE(*libgcc.a: *libc.a:*lib_a-mem*.o *libm.a:) .rodata*)
-        . = ALIGN(4);
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.flashdata*)))
-        . = ALIGN(4);
-    } > FLASH
-
-    .ARM.extab :
-    {
-        *(.ARM.extab* .gnu.linkonce.armextab.*)
-    } > FLASH
-
-    __exidx_start = .;
-    .ARM.exidx :
-    {
-        *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-    } > FLASH
-    __exidx_end = .;
-
-    /* Machine inspectable binary information */
-    . = ALIGN(4);
-    __binary_info_start = .;
-    .binary_info :
-    {
-        KEEP(*(.binary_info.keep.*))
-        *(.binary_info.*)
-    } > FLASH
-    __binary_info_end = .;
-    . = ALIGN(4);
-
-    .ram_vector_table (NOLOAD): {
-        *(.ram_vector_table)
-    } > RAM
-
-    .uninitialized_data (NOLOAD): {
-        . = ALIGN(4);
-        *(.uninitialized_data*)
-    } > RAM
-
-    .data : {
-        __data_start__ = .;
-        *(vtable)
-
-        *(.time_critical*)
-
-        /* remaining .text and .rodata; i.e. stuff we exclude above because we want it in RAM */
-        *(.text*)
-        . = ALIGN(4);
-        *(.rodata*)
-        . = ALIGN(4);
-
-        *(.data*)
-
-        . = ALIGN(4);
-        *(.after_data.*)
-        . = ALIGN(4);
-        /* preinit data */
-        PROVIDE_HIDDEN (__mutex_array_start = .);
-        KEEP(*(SORT(.mutex_array.*)))
-        KEEP(*(.mutex_array))
-        PROVIDE_HIDDEN (__mutex_array_end = .);
-
-        . = ALIGN(4);
-        *(.jcr)
-        . = ALIGN(4);
-    } > RAM AT> FLASH
-
-    .tdata : {
-        . = ALIGN(4);
-		*(.tdata .tdata.* .gnu.linkonce.td.*)
-        /* All data end */
-        __tdata_end = .;
-    } > RAM AT> FLASH
-    PROVIDE(__data_end__ = .);
-
-    /* __etext is (for backwards compatibility) the name of the .data init source pointer (...) */
-    __etext = LOADADDR(.data);
-
-    .tbss (NOLOAD) : {
-        . = ALIGN(4);
-        __bss_start__ = .;
-        __tls_base = .;
-        *(.tbss .tbss.* .gnu.linkonce.tb.*)
-        *(.tcommon)
-
-        __tls_end = .;
-    } > RAM
-
-    .bss (NOLOAD) : {
-        . = ALIGN(4);
-        __tbss_end = .;
-
-        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.bss*)))
-        *(COMMON)
-        . = ALIGN(4);
-        __bss_end__ = .;
-    } > RAM
-
-    .heap (NOLOAD):
-    {
-        __end__ = .;
-        end = __end__;
-        KEEP(*(.heap*))
-    } > RAM
-    /* historically on GCC sbrk was growing past __HeapLimit to __StackLimit, however
-       to be more compatible, we now set __HeapLimit explicitly to where the end of the heap is */
-    __HeapLimit = ORIGIN(RAM) + LENGTH(RAM);
-
-    /* Start and end symbols must be word-aligned */
-    .scratch_x : {
-        __scratch_x_start__ = .;
-        *(.scratch_x.*)
-        . = ALIGN(4);
-        __scratch_x_end__ = .;
-    } > SCRATCH_X AT > FLASH
-    __scratch_x_source__ = LOADADDR(.scratch_x);
-
-    .scratch_y : {
-        __scratch_y_start__ = .;
-        *(.scratch_y.*)
-        . = ALIGN(4);
-        __scratch_y_end__ = .;
-    } > SCRATCH_Y AT > FLASH
-    __scratch_y_source__ = LOADADDR(.scratch_y);
-
-    /* .stack*_dummy section doesn't contains any symbols. It is only
-     * used for linker to calculate size of stack sections, and assign
-     * values to stack symbols later
-     *
-     * stack1 section may be empty/missing if platform_launch_core1 is not used */
-
-    /* by default we put core 0 stack at the end of scratch Y, so that if core 1
-     * stack is not used then all of SCRATCH_X is free.
-     */
-    .stack1_dummy (NOLOAD):
-    {
-        *(.stack1*)
-    } > SCRATCH_X
-    .stack_dummy (NOLOAD):
-    {
-        KEEP(*(.stack*))
-    } > SCRATCH_Y
-
-    .flash_end : {
-        KEEP(*(.embedded_end_block*))
-        PROVIDE(__flash_binary_end = .);
-    } > FLASH
-
-    /* stack limit is poorly named, but historically is maximum heap ptr */
-    __StackLimit = ORIGIN(RAM) + LENGTH(RAM);
-    __StackOneTop = ORIGIN(SCRATCH_X) + LENGTH(SCRATCH_X);
-    __StackTop = ORIGIN(SCRATCH_Y) + LENGTH(SCRATCH_Y);
-    __StackOneBottom = __StackOneTop - SIZEOF(.stack1_dummy);
-    __StackBottom = __StackTop - SIZEOF(.stack_dummy);
-    PROVIDE(__stack = __StackTop);
-
-    /* picolibc and LLVM */
-    PROVIDE (__heap_start = __end__);
-    PROVIDE (__heap_end = __HeapLimit);
-    PROVIDE( __tls_align = MAX(ALIGNOF(.tdata), ALIGNOF(.tbss)) );
-    PROVIDE( __tls_size_align = (__tls_size + __tls_align - 1) & ~(__tls_align - 1));
-    PROVIDE( __arm32_tls_tcb_offset = MAX(8, __tls_align) );
-
-    /* llvm-libc */
-    PROVIDE (_end = __end__);
-    PROVIDE (__llvm_libc_heap_limit = __HeapLimit);
-
-    /* Check if data + heap + stack exceeds RAM limit */
-    ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed")
-
-    ASSERT( __binary_info_header_end - __logical_binary_start <= 256, "Binary info must be in first 256 bytes of the binary")
-    /* todo assert on extra code */
-}
-
+/* BEGIN_MEMMAP_INCLUDE_TREE
+ * This is the default include tree for this file (generated by tools/memmap_annotate.py
+ * and tools/memmap_include_tree.py). To override any files in this tree, see the
+ * pico_add_linker_script_override_path CMake function under pico_standard_link.
+ *
+ * memmap_default.ld                                     rp2040/pico_platform
+ * └── memmap_default.incl                               rp2_common/pico_standard_link
+ *     ├── set_memory_locations.incl                     rp2_common/pico_standard_link
+ *     ├── memory_flash.incl                             rp2_common/pico_standard_link
+ *     ├── memory_psram.incl                             rp2040/pico_platform
+ *     ├── memory_xip_ram.incl                           rp2_common/pico_standard_link
+ *     ├── memory_ram.incl                               rp2_common/pico_standard_link
+ *     ├── memory_scratch.incl                           rp2_common/pico_standard_link
+ *     ├── memory_generated.incl                         rp2_common/pico_standard_link
+ *     ├── memory_extra.incl                             rp2_common/pico_standard_link
+ *     ├── memory_aliases_flash.incl                     rp2_common/pico_standard_link
+ *     └── sections_default.incl                         rp2_common/pico_standard_link
+ *         ├── sections_default_text.incl                rp2040/pico_platform
+ *         │   ├── section_flash_begin.incl              rp2_common/pico_standard_link
+ *         │   ├── section_boot2.incl                    rp2040/pico_platform
+ *         │   ├── section_default_text.incl             rp2_common/pico_standard_link
+ *         │   │   └── default_text_excludes.incl        rp2_common/pico_standard_link
+ *         │   ├── section_default_rodata.incl           rp2_common/pico_standard_link
+ *         │   │   └── default_rodata_excludes.incl      rp2_common/pico_standard_link
+ *         │   ├── sections_arm_ex.incl                  rp2_common/pico_standard_link
+ *         │   └── section_binary_info.incl              rp2_common/pico_standard_link
+ *         ├── section_generated_post_text.incl          rp2_common/pico_standard_link
+ *         ├── section_extra_post_text.incl              rp2_common/pico_standard_link
+ *         ├── sections_psram.incl                       rp2040/pico_platform
+ *         ├── section_xip_ram.incl                      rp2_common/pico_standard_link
+ *         ├── sections_default_data.incl                rp2_common/pico_standard_link
+ *         │   ├── section_ram_vector_table.incl         rp2_common/pico_standard_link
+ *         │   ├── section_uninitialized_data.incl       rp2_common/pico_standard_link
+ *         │   ├── section_default_data.incl             rp2_common/pico_standard_link
+ *         │   ├── section_tls.incl                      rp2_common/pico_standard_link
+ *         │   └── section_persistent_data.incl          rp2_common/pico_standard_link
+ *         ├── section_generated_post_data.incl          rp2_common/pico_standard_link
+ *         ├── section_extra_post_data.incl              rp2_common/pico_standard_link
+ *         ├── section_heap.incl                         rp2_common/pico_standard_link
+ *         ├── sections_scratch.incl                     rp2_common/pico_standard_link
+ *         ├── section_generated_post_scratch.incl       rp2_common/pico_standard_link
+ *         ├── section_extra_post_scratch.incl           rp2_common/pico_standard_link
+ *         ├── sections_stack.incl                       rp2_common/pico_standard_link
+ *         ├── section_flash_end.incl                    rp2_common/pico_standard_link
+ *         ├── section_end.incl                          rp2_common/pico_standard_link
+ *         ├── section_generated_post_end.incl           rp2_common/pico_standard_link
+ *         ├── section_extra_post_end.incl               rp2_common/pico_standard_link
+ *         ├── section_platform_end.incl                 rp2040/pico_platform
+ *         ├── section_generated_post_platform_end.incl  rp2_common/pico_standard_link
+ *         └── section_extra_post_platform_end.incl      rp2_common/pico_standard_link
+ * END_MEMMAP_INCLUDE_TREE */
