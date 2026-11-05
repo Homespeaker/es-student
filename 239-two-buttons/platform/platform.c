@@ -1,0 +1,20 @@
+#include "platform/platform.h"
+#include "pico/stdlib.h"
+static const unsigned LED_PIN = 25, BUTTON_PIN = 15;
+void platform_init(void) {
+    stdio_init_all();
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+    gpio_init(BUTTON_PIN);
+    gpio_set_dir(BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(BUTTON_PIN);
+    gpio_init(16);
+    gpio_set_dir(16, GPIO_IN);
+    gpio_pull_up(16);
+}
+void platform_led_set(bool on) {
+    gpio_put(LED_PIN, on);
+}
+bool platform_button_read(unsigned index) {
+    return !gpio_get(index ? 16 : BUTTON_PIN);
+}
