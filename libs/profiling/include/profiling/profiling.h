@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
 #ifndef PROFILING_ENABLED
 #define PROFILING_ENABLED 1
 #endif
@@ -12,12 +13,12 @@ typedef struct {
 void profiling_stopwatch_init(unsigned index, const char *name);
 void profiling_start(unsigned index);
 void profiling_stop(unsigned index);
-void profiling_get(unsigned index, profiling_result_t *result);
+bool profiling_get(unsigned index, profiling_result_t *result);
 void profiling_reset(void);
 #else
 #define profiling_stopwatch_init(...) ((void)0)
 #define profiling_start(...) ((void)0)
 #define profiling_stop(...) ((void)0)
-#define profiling_get(index, result) ((void)(index), (void)(result))
+#define profiling_get(index, result) ((void)(index), (void)(result), false)
 #define profiling_reset() ((void)0)
 #endif

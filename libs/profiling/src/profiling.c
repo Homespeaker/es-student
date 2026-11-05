@@ -20,9 +20,11 @@ void profiling_stop(unsigned i) {
     if (dt > watches[i].max_us)
         watches[i].max_us = dt;
 }
-void profiling_get(unsigned i, profiling_result_t *r) {
-    if (i < 8 && r)
-        *r = watches[i];
+bool profiling_get(unsigned i, profiling_result_t *r) {
+    if (i >= 8 || !r || !watches[i].name)
+        return false;
+    *r = watches[i];
+    return true;
 }
 void profiling_reset(void) {
     for (unsigned i = 0; i < 8; ++i) {

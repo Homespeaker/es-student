@@ -54,7 +54,7 @@ void mem_info(void) {
 }
 static void function_row(const char *name, uintptr_t address) {
     printf("%-16s 0x%08x 0x%04x\n", name, (unsigned)address,
-           *(const uint16_t *)(address & ~(uintptr_t)1));
+           *(const uint16_t *)(address & ~1u));
 }
 void fw_info(void) {
     int stack_variable = 0;

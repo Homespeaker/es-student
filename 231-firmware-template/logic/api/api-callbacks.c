@@ -105,9 +105,10 @@ static void pi(const command_t *c) {
 static void profiling(const command_t *c) {
     (void)c;
 #if PROFILING_ENABLED
-    for (unsigned i = 0; i < 5; ++i) {
+    for (unsigned i = 0; i < 8; ++i) {
         profiling_result_t r;
-        profiling_get(i, &r);
+        if (!profiling_get(i, &r))
+            continue;
         printf("%-10s count %llu mean %.2f us max %lu us\n", r.name ? r.name : "unused",
                (unsigned long long)r.count, r.count ? (double)r.total_us / r.count : 0,
                (unsigned long)r.max_us);
