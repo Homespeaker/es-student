@@ -1,3 +1,9 @@
 build/
 .vscode/
 .DS_Store
+__pycache__/
+build-*/
+configure.log
+build.log
+build-configure.log
+build-output.log
