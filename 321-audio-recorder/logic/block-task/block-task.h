@@ -1,0 +1,7 @@
+#pragma once
+#include <stdbool.h>
+#include <stdint.h>
+typedef void (*block_task_callback_t)(const uint16_t *samples, uint32_t count, uint32_t elapsed_us);
+void block_task_init(void);
+bool block_task_start(uint32_t count, block_task_callback_t callback);
+void block_task_handle(void);
